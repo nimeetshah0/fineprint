@@ -773,7 +773,32 @@ export function RedlinerApp() {
             ))}
 
             <section className="section-card">
-              <h2 className="card-heading">Add Custom Company Playbook</h2>
+              <div className="card-header">
+                <div>
+                  <h2 className="card-heading">Add or Edit Community Playbooks</h2>
+                  <div className="appbar-sub">
+                    Built-in playbooks live in <code>src/playbooks.json</code>. Open a GitHub PR to add a new playbook or refine existing rules for everyone.
+                  </div>
+                </div>
+                <button
+                  className="m3-btn m3-btn-tonal"
+                  onClick={() => {
+                    const url = 'https://github.com/nimeetshah0/fineprint/edit/main/src/playbooks.json';
+                    const app = appRef.current;
+                    if (app && connected) {
+                      void app.openLink({ url });
+                    } else {
+                      window.open(url, '_blank', 'noopener,noreferrer');
+                    }
+                  }}
+                >
+                  Open GitHub PR ↗
+                </button>
+              </div>
+            </section>
+
+            <section className="section-card">
+              <h2 className="card-heading">Add Local Session Playbook</h2>
               <input
                 className="m3-input"
                 placeholder="Playbook name (e.g. Acme Enterprise Sales MSA)"

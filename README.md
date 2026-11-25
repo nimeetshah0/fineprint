@@ -52,6 +52,34 @@ Running locally via `npx` unlocks `read_contract` so you can point your agent at
 
 ---
 
+## Contributing Playbooks (via GitHub PR)
+
+All built-in playbooks live in [`src/playbooks.json`](src/playbooks.json). To add a new playbook (e.g., Commercial Lease, Healthcare BAA, Consulting Agreement) or improve existing rules:
+
+1. Edit [`src/playbooks.json`](https://github.com/nimeetshah0/fineprint/edit/main/src/playbooks.json) directly on GitHub or in a fork.
+2. Add an entry matching this shape:
+   ```json
+   {
+     "id": "commercial-lease",
+     "name": "Commercial Office Lease",
+     "audience": "Founders & Ops",
+     "description": "Flags personal guarantees, uncapped CAM charges, and renewal traps.",
+     "builtIn": true,
+     "rules": [
+       {
+         "id": "lease-guarantee",
+         "topic": "Personal Guarantee",
+         "severity": "dealbreaker",
+         "position": "Remove personal guarantees; limit security to corporate deposit or letter of credit.",
+         "fallback": "Good-guy guarantee capped at 3 months rent."
+       }
+     ]
+   }
+   ```
+3. Open a [Pull Request](https://github.com/nimeetshah0/fineprint/pulls) — once merged, it goes live automatically on `https://fineprint.nimhq.com/mcp`.
+
+---
+
 ## Deploy Your Own to Cloudflare Workers (Free Tier)
 
 ```bash
