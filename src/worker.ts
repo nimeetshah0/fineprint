@@ -62,9 +62,9 @@ function landingHtml(origin: string): string {
 </head>
 <body>
   <main class="card">
-    <span class="badge">Free &amp; Open Source · Zero Contract Retention</span>
+    <span class="badge">Free &amp; Open Source · Zero Contract Retention · MCP Apps + Skills</span>
     <h1>Fineprint</h1>
-    <p>Catch hidden contract traps before you sign. An interactive Material 3 contract redliner for <strong>Claude</strong>, <strong>ChatGPT</strong>, and <strong>Google Antigravity</strong>—with native Microsoft Word Track Changes (<code>.docx</code>) and margin comments export.</p>
+    <p>Catch hidden contract traps before you sign. An interactive Material 3 contract redliner for <strong>Claude</strong>, <strong>ChatGPT</strong>, and <strong>Google Antigravity</strong>—supporting <strong>Google Docs</strong>, drag-and-drop <code>.docx</code> / <code>.pdf</code> uploads, and native Microsoft Word Track Changes (<code>.docx</code>) with margin comments.</p>
     <div class="url-box">
       <code id="u">${mcpUrl}</code>
       <button onclick="navigator.clipboard.writeText('${mcpUrl}');this.textContent='Copied!'">Copy URL</button>
@@ -72,8 +72,8 @@ function landingHtml(origin: string): string {
     <ul>
       <li><strong>Claude.ai / Mobile:</strong> Settings → Connectors → Add Custom Connector → paste URL above.</li>
       <li><strong>ChatGPT:</strong> Settings → Connectors / Apps → Add MCP Server → paste URL above.</li>
-      <li><strong>Antigravity / Local Desktop:</strong> Run <code>npx -y contract-redliner-mcp</code> for local <code>.docx</code> &amp; <code>.pdf</code> round-tripping.</li>
-      <li><strong>Add or Edit Playbooks:</strong> Playbooks live in <a href="https://github.com/nimeetshah0/fineprint/blob/main/src/playbooks.json" target="_blank" rel="noopener noreferrer" style="color:#8ab4f8;"><code>src/playbooks.json</code></a> — open a <a href="https://github.com/nimeetshah0/fineprint/pulls" target="_blank" rel="noopener noreferrer" style="color:#8ab4f8;">GitHub PR</a> to contribute new industry playbooks or improve rules.</li>
+      <li><strong>Google Docs &amp; Drag-and-Drop:</strong> Paste any link-shared Google Docs URL or drop a <code>.docx</code> / <code>.pdf</code> directly into the Fineprint UI—exported Track Changes preserve formatting and re-import into Google Docs as native Suggestions.</li>
+      <li><strong>Playbooks via Skills over MCP + GitHub PRs:</strong> Built-in playbooks are delivered dynamically via <strong>Skills over MCP</strong> (<code>skill://fineprint/SKILL.md</code>) and sourced from <a href="https://github.com/nimeetshah0/fineprint/blob/main/src/playbooks.json" target="_blank" rel="noopener noreferrer" style="color:#8ab4f8;"><code>src/playbooks.json</code></a>—open a <a href="https://github.com/nimeetshah0/fineprint/pulls" target="_blank" rel="noopener noreferrer" style="color:#8ab4f8;">GitHub PR</a> to add or refine community playbooks for everyone.</li>
     </ul>
     <div class="footer-links">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
