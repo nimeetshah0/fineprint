@@ -811,7 +811,8 @@ export function RedlinerApp() {
         <footer className="bottombar">
           <div className="action-group">
             <span className="appbar-sub">
-              {payload.summary.accepted} accepted · {payload.summary.pending} pending
+              {payload.summary.accepted} accepted · {payload.summary.pending} pending ·{' '}
+              <em>Drafting aid only, not legal advice</em>
             </span>
             {toast && <span className="toast">{toast}</span>}
           </div>

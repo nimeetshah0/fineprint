@@ -150,6 +150,12 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
       description:
         'Returns built-in (and local custom) contract review playbooks (Startup Vendor MSA, Agency Client SOW, Mutual NDA) with risk rules and fallback positions. Call this before reviewing a contract so you redline against the right playbook.',
       inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async () => {
       const playbooks = opts.listPlaybooks();
@@ -185,6 +191,12 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
         inputSchema: {
           filePath: z.string().describe('Absolute path to a local .docx or .pdf contract file'),
         },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
       },
       async ({ filePath }) => reader(filePath)
     );
@@ -198,6 +210,12 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
         inputSchema: {
           filePath: z.string().describe('Absolute path to a local .docx or .pdf contract file'),
         },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
       },
       async ({ filePath }) => reader(filePath)
     );
@@ -207,9 +225,9 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
   server.registerTool(
     'open_redliner',
     {
-      title: 'Contract Redliner',
+      title: 'Fineprint Contract Redliner',
       description:
-        'Opens the interactive Contract Redliner UI showing Before/After clause cards, risk badges, Accept/Keep/Soften controls, playbooks, and 1-click export to Word Track Changes (.docx), Clean Final (.docx), PDF Report, or Markdown. Call with structured redlines after reviewing a contract, or with {} to open the workbench with a sample demo contract.',
+        'Opens the interactive Fineprint Contract Redliner UI showing Before/After clause cards, risk badges, Accept/Keep/Soften controls, playbooks, and 1-click export to Word Track Changes (.docx), Clean Final (.docx), PDF Report, or Markdown. Drafting aid only — not legal advice. Call with structured redlines after reviewing a contract, or with {} to open the workbench with a sample demo contract.',
       inputSchema: {
         title: z.string().optional().describe('Contract title, e.g. "Acme SaaS MSA"'),
         counterparty: z.string().optional().describe('Counterparty name, e.g. "Acme Corp"'),
@@ -225,6 +243,12 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
           .array(ClauseInputSchema)
           .optional()
           .describe('Structured clause redlines generated from the contract'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
       },
       _meta: {
         ui: {
@@ -293,6 +317,8 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
                 (c) =>
                   `- **${c.section} — ${c.heading}** [${c.riskLevel.toUpperCase()}]: ${c.rationale}`
               ),
+              '',
+              '_Note: Fineprint is a drafting and formatting aid, not legal advice. Have qualified counsel review before signing._',
             ].join('\n');
 
       return {
@@ -309,6 +335,12 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
       title: 'Load Demo Contract (App Only)',
       description: 'Loads a sample SaaS Vendor MSA with 5 classic founder traps.',
       inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
       _meta: { ui: { visibility: ['app'] } },
     },
     async () => {
@@ -341,6 +373,12 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
         clauseId: z.string(),
         decision: z.enum(['pending', 'accepted', 'rejected']).optional(),
         proposedText: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
       },
       _meta: { ui: { visibility: ['app'] } },
     },
@@ -410,6 +448,12 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
             })
           )
           .optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
       },
       _meta: { ui: { visibility: ['app'] } },
     },
@@ -566,6 +610,12 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
             fallback: z.string(),
           })
         ),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
       },
       _meta: { ui: { visibility: ['app'] } },
     },
