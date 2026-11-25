@@ -126,6 +126,14 @@ export function RedlinerApp() {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [toast, setToast] = useState('');
 
+  // In-memory browser upload & Google Docs state (zero server disk retention!)
+  const [uploadedDocxBase64, setUploadedDocxBase64] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [gdocInput, setGdocInput] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [tab, setTab] = useState<TabMode>('redlines');
   const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('before_after');
   const [riskFilter, setRiskFilter] = useState<RiskFilter>('all');
@@ -280,6 +288,94 @@ export function RedlinerApp() {
     showToast(`Asked agent to soften ${clause.section}.`);
   };
 
+  const handleFileSelected = async (file: File) => {
+    const app = appRef.current;
+    if (!app || !connected) return;
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith('.docx') && !lower.endsWith('.pdf')) {
+      showToast('Please upload a .docx or .pdf contract file.');
+      return;
+    }
+    setUploading(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result || '');
+          resolve(result.includes(',') ? result.split(',')[1] : result);
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+
+      if (lower.endsWith('.docx')) {
+        setUploadedDocxBase64(base64);
+        setUploadedFileName(file.name);
+      } else {
+        setUploadedDocxBase64(null);
+        setUploadedFileName(file.name);
+      }
+
+      const res = await app.callServerTool({
+        name: 'app_parse_upload',
+        arguments: { fileName: file.name, base64 },
+      });
+      const sc = res?.structuredContent as
+        | { ok?: boolean; fileName?: string; paragraphs?: Array<{ index: number; text: string }> }
+        | undefined;
+
+      if (sc?.ok && sc.paragraphs && sc.paragraphs.length > 0) {
+        if (canMessage) {
+          const numbered = sc.paragraphs
+            .slice(0, 120)
+            .map((p) => `[P${p.index}] ${p.text}`)
+            .join('\n\n');
+          await app.sendMessage({
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `I uploaded **${file.name}** into Fineprint (${sc.paragraphs.length} paragraphs). Please review it against the **${payload.playbookName || 'Startup Vendor MSA'}** playbook (call \`list_playbooks\` if needed) and call \`open_redliner\` with matching \`paragraphIndex\` values so my exported Track Changes preserve the original formatting.\n\n${numbered}`,
+              },
+            ],
+          });
+          showToast(`Parsed ${file.name} and sent to AI for redlining!`);
+        } else {
+          showToast(`Parsed ${file.name} (${sc.paragraphs.length} paragraphs).`);
+        }
+      } else {
+        showToast('Could not extract text from file.');
+      }
+    } catch (err) {
+      showToast(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleLoadGoogleDoc = async () => {
+    const url = gdocInput.trim();
+    const app = appRef.current;
+    if (!url || !app || !connected) return;
+    setUploading(true);
+    try {
+      if (canMessage) {
+        await app.sendMessage({
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `Read this Google Doc using Fineprint's \`read_google_doc\` tool: ${url} — then review it against the **${payload.playbookName || 'Startup Vendor MSA'}** playbook and call \`open_redliner\` with \`googleDocUrl\` and matching \`paragraphIndex\` values.`,
+            },
+          ],
+        });
+        showToast('Sent Google Doc to AI for Fineprint review!');
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleExport = async (format: ExportFormat) => {
     setExportMenuOpen(false);
     const app = appRef.current;
@@ -312,6 +408,11 @@ export function RedlinerApp() {
         })),
       };
       if (payload.sourceFilePath) exportArgs.sourceFilePath = payload.sourceFilePath;
+      if (payload.googleDocUrl) exportArgs.googleDocUrl = payload.googleDocUrl;
+      if (uploadedDocxBase64) {
+        exportArgs.sourceDocxBase64 = uploadedDocxBase64;
+        if (uploadedFileName) exportArgs.sourceFileName = uploadedFileName;
+      }
 
       const res = await app.callServerTool({
         name: 'app_export_docx',
@@ -519,10 +620,63 @@ export function RedlinerApp() {
           <div className="empty-card">
             <h2>Fineprint</h2>
             <p>
-              Paste an NDA, MSA, or SOW in chat—or point your agent at a local{' '}
-              <code>.docx</code> or <code>.pdf</code> file—to review each section as an
-              interactive card and export native Microsoft Word Track Changes.
+              Drop a <code>.docx</code> or <code>.pdf</code> contract, paste a link-shared{' '}
+              <strong>Google Docs</strong> URL, or load the sample MSA. Export native Word
+              Track Changes (which re-import into Google Docs as Suggestions).
             </p>
+
+            {/* Drag-and-drop file upload zone */}
+            <div
+              className={`dropzone ${dragActive ? 'drag-active' : ''}`}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragActive(false);
+                const f = e.dataTransfer.files?.[0];
+                if (f) void handleFileSelected(f);
+              }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".docx,.pdf"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleFileSelected(f);
+                }}
+              />
+              <strong>
+                {uploading ? 'Reading contract…' : 'Drop .docx or .pdf here (or click to browse)'}
+              </strong>
+              <span className="appbar-sub">
+                Processed strictly in memory · Original .docx formatting preserved on export
+              </span>
+            </div>
+
+            {/* Google Docs URL input */}
+            <div className="gdoc-row">
+              <input
+                className="m3-input"
+                placeholder="Paste Google Docs URL (https://docs.google.com/document/d/...)"
+                value={gdocInput}
+                onChange={(e) => setGdocInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void handleLoadGoogleDoc()}
+              />
+              <button
+                className="m3-btn m3-btn-tonal"
+                disabled={uploading || !gdocInput.trim() || !canMessage}
+                onClick={() => void handleLoadGoogleDoc()}
+              >
+                Review Google Doc
+              </button>
+            </div>
+
             <button className="m3-btn m3-btn-filled" onClick={handleLoadDemo}>
               Load Sample SaaS Vendor MSA
             </button>

@@ -44,9 +44,10 @@ export interface RedlinerSessionPayload {
   counterparty: string;
   playbookId: string;
   playbookName: string;
-  sourceType: 'docx' | 'pdf' | 'text' | 'demo' | 'empty';
+  sourceType: 'docx' | 'pdf' | 'gdoc' | 'text' | 'demo' | 'empty';
   sourceFileName?: string;
   sourceFilePath?: string;
+  googleDocUrl?: string;
   clauses: RedlineClause[];
   playbooks: Playbook[];
   summary: {

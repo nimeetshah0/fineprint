@@ -656,3 +656,31 @@ body,
   font-size: 11px;
   color: var(--md-on-surface-var);
 }
+
+/* Drag-and-drop Upload & Google Docs Bar */
+.dropzone {
+  width: 100%;
+  border: 1.5px dashed var(--md-outline-var);
+  border-radius: 14px;
+  padding: 18px 16px;
+  background: var(--md-surface-inset);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dropzone:hover,
+.dropzone.drag-active {
+  border-color: var(--md-primary);
+  background: var(--md-primary-container);
+}
+
+.gdoc-row {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}

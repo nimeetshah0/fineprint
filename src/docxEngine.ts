@@ -127,11 +127,14 @@ function findParagraphRanges(docXml: string): Array<{ start: number; end: number
 }
 
 /**
- * Extracts numbered plain-text paragraphs from a .docx file purely in memory.
+ * Parses a .docx from an in-memory Buffer/Uint8Array (works in Cloudflare Workers and Node).
  * Reads the current accepted view (includes <w:ins> text, excludes <w:delText>).
  */
-export async function parseDocxFile(filePath: string): Promise<ParsedDocx> {
-  const buffer = fs.readFileSync(filePath);
+export async function parseDocxBuffer(
+  input: Buffer | Uint8Array,
+  fileName = 'contract.docx'
+): Promise<ParsedDocx> {
+  const buffer = Buffer.isBuffer(input) ? input : Buffer.from(input);
   const zip = await JSZip.loadAsync(buffer);
   const docXml = await zip.file('word/document.xml')?.async('string');
   if (!docXml) {
@@ -142,7 +145,6 @@ export async function parseDocxFile(filePath: string): Promise<ParsedDocx> {
   const ranges = findParagraphRanges(docXml);
 
   ranges.forEach((r, idx) => {
-    // Strip <w:del>...</w:del> blocks before reading <w:t> so we get the current accepted view
     const withoutDel = r.xml.replace(/<w:del\b[\s\S]*?<\/w:del>/g, '');
     const textRuns = [...withoutDel.matchAll(/<w:t(?:\s+[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((m) =>
       xmlUnescape(m[1])
@@ -153,8 +155,56 @@ export async function parseDocxFile(filePath: string): Promise<ParsedDocx> {
     }
   });
 
-  const fileName = filePath.split(/[\\/]/).pop() || 'contract.docx';
   return { fileName, buffer, paragraphs };
+}
+
+/**
+ * Extracts numbered plain-text paragraphs from a local .docx file purely in memory.
+ */
+export async function parseDocxFile(filePath: string): Promise<ParsedDocx> {
+  const buffer = fs.readFileSync(filePath);
+  const fileName = filePath.split(/[\\/]/).pop() || 'contract.docx';
+  return parseDocxBuffer(buffer, fileName);
+}
+
+/**
+ * Extracts a Google Docs document ID from a standard docs.google.com URL.
+ */
+export function extractGoogleDocId(urlOrId: string): string | null {
+  const trimmed = urlOrId.trim();
+  const match = trimmed.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/i);
+  if (match) return match[1];
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
+/**
+ * Fetches a link-shared Google Doc directly as a real .docx binary in memory.
+ * Exported Track Changes (.docx) re-upload into Google Docs as native Suggestions!
+ */
+export async function fetchGoogleDocAsDocx(urlOrId: string): Promise<ParsedDocx> {
+  const docId = extractGoogleDocId(urlOrId);
+  if (!docId) {
+    throw new Error(
+      'Invalid Google Docs URL. Expected https://docs.google.com/document/d/<DOC_ID>/edit'
+    );
+  }
+  const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=docx`;
+  const res = await fetch(exportUrl, { redirect: 'follow' });
+  const contentType = res.headers.get('content-type') || '';
+
+  if (!res.ok || contentType.includes('text/html')) {
+    throw new Error(
+      'This Google Doc is private or requires sign-in. Either temporarily set sharing to "Anyone with the link can view", or in Google Docs click File → Download → Microsoft Word (.docx) and drop the file into Fineprint.'
+    );
+  }
+
+  const arrBuf = await res.arrayBuffer();
+  const cd = res.headers.get('content-disposition') || '';
+  const nameMatch = cd.match(/filename\*?=(?:UTF-8'')?"?([^";\n]+)"?/i);
+  const fileName = nameMatch ? decodeURIComponent(nameMatch[1]) : `GoogleDoc_${docId.slice(0, 8)}.docx`;
+
+  return parseDocxBuffer(new Uint8Array(arrBuf), fileName);
 }
 
 /**

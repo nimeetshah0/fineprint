@@ -3,10 +3,20 @@ import { z } from 'zod';
 import {
   computeWordDiff,
   exportTrackedChangesDocx,
+  fetchGoogleDocAsDocx,
+  parseDocxBuffer,
   type ParsedDocx,
 } from './docxEngine.js';
+import { parsePdfBuffer } from './pdfEngine.js';
 import { exportMarkdownMemo, exportRedlinePdfReport } from './pdfExport.js';
 import { BUILT_IN_PLAYBOOKS, buildDemoClauses } from './playbooks.js';
+import {
+  buildSkillManifest,
+  renderFineprintSkillMd,
+  renderPlaybooksReferenceMd,
+  SKILL_PLAYBOOKS_URI,
+  SKILL_URI,
+} from './skills.js';
 import type {
   ExportDocxResult,
   ExportFormat,
@@ -23,9 +33,10 @@ export interface InMemorySession {
   title: string;
   counterparty: string;
   playbookId: string;
-  sourceType: 'docx' | 'pdf' | 'text' | 'demo' | 'empty';
+  sourceType: 'docx' | 'pdf' | 'gdoc' | 'text' | 'demo' | 'empty';
   sourceFileName?: string;
   sourceFilePath?: string;
+  googleDocUrl?: string;
   sourceDocx?: ParsedDocx;
   clauses: RedlineClause[];
 }
@@ -97,6 +108,7 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
       sourceType: session.sourceType,
       sourceFileName: session.sourceFileName || session.sourceDocx?.fileName,
       sourceFilePath: opts.publicMode ? undefined : session.sourceFilePath,
+      googleDocUrl: session.googleDocUrl,
       clauses: session.clauses,
       playbooks: allPbs,
       summary: summarizeClauses(session.clauses),
@@ -106,15 +118,82 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
 
   const server = new McpServer(
     {
-      name: 'contract-redliner',
-      version: '0.3.0',
+      name: 'fineprint',
+      version: '0.4.0',
     },
     {
       capabilities: {
         resources: {},
         tools: {},
+        experimental: {
+          'io.modelcontextprotocol/skills': {
+            directoryRead: true,
+          },
+        },
       },
     }
+  );
+
+  // SEP-2640 Skills over MCP: skills/list and skills/get JSON-RPC handlers
+  const SkillsListReq = z.object({
+    method: z.literal('skills/list'),
+    params: z.object({}).passthrough().optional(),
+  });
+  const SkillsGetReq = z.object({
+    method: z.literal('skills/get'),
+    params: z.object({ uri: z.string() }),
+  });
+
+  server.server.setRequestHandler(SkillsListReq, async () => {
+    const manifest = await buildSkillManifest(opts.listPlaybooks());
+    return { skills: [manifest] };
+  });
+
+  server.server.setRequestHandler(SkillsGetReq, async ({ params }) => {
+    const manifest = await buildSkillManifest(opts.listPlaybooks());
+    if (params.uri !== SKILL_URI) {
+      throw new Error(`Unknown skill URI: ${params.uri}`);
+    }
+    return { skill: manifest };
+  });
+
+  // Register Skill resources (skill://fineprint/SKILL.md + references/playbooks.md)
+  server.registerResource(
+    'fineprint-skill',
+    SKILL_URI,
+    {
+      title: 'Fineprint Contract Review Skill',
+      description: 'Step-by-step workflow for reviewing contracts and exporting native Word Track Changes with Fineprint.',
+      mimeType: 'text/markdown',
+    },
+    async () => ({
+      contents: [
+        {
+          uri: SKILL_URI,
+          mimeType: 'text/markdown',
+          text: renderFineprintSkillMd(),
+        },
+      ],
+    })
+  );
+
+  server.registerResource(
+    'fineprint-skill-playbooks',
+    SKILL_PLAYBOOKS_URI,
+    {
+      title: 'Fineprint Playbooks Reference',
+      description: 'Complete reference of built-in Fineprint contract review playbooks and fallback positions.',
+      mimeType: 'text/markdown',
+    },
+    async () => ({
+      contents: [
+        {
+          uri: SKILL_PLAYBOOKS_URI,
+          mimeType: 'text/markdown',
+          text: renderPlaybooksReferenceMd(opts.listPlaybooks()),
+        },
+      ],
+    })
   );
 
   // 1. UI HTML resource
@@ -180,7 +259,67 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
     }
   );
 
-  // 3. Local-only file readers (disabled in public HTTP / Cloudflare Worker mode!)
+  // 3a. Google Docs reader (works in BOTH Cloudflare Worker and local stdio!)
+  server.registerTool(
+    'read_google_doc',
+    {
+      title: 'Read Google Doc Contract',
+      description:
+        'Fetches a link-shared Google Docs contract URL (https://docs.google.com/document/d/<ID>/edit) as a native .docx in memory (zero retention) and returns numbered paragraphs. Pass googleDocUrl and paragraphIndex to open_redliner so exported Track Changes preserve formatting and re-import into Google Docs as native Suggestions.',
+      inputSchema: {
+        googleDocUrl: z
+          .string()
+          .describe('Google Docs URL (https://docs.google.com/document/d/<DOC_ID>/edit)'),
+      },
+      annotations: {
+        title: 'Read Google Doc Contract',
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ googleDocUrl }) => {
+      const parsed = await fetchGoogleDocAsDocx(googleDocUrl);
+      const sessionId = randomId('gdoc');
+      if (!opts.publicMode) {
+        sessions.set(sessionId, {
+          sessionId,
+          title: parsed.fileName.replace(/\.docx$/i, ''),
+          counterparty: '',
+          playbookId: 'startup-vendor-msa',
+          sourceType: 'gdoc',
+          sourceFileName: parsed.fileName,
+          googleDocUrl,
+          sourceDocx: parsed,
+          clauses: [],
+        });
+      }
+
+      const numbered = parsed.paragraphs
+        .map((p) => `[P${p.index}] ${p.text}`)
+        .join('\n\n');
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Loaded Google Doc \`${parsed.fileName}\` in memory (**${parsed.paragraphs.length} paragraphs**, zero retention). Pass \`googleDocUrl: "${googleDocUrl}"\` and matching \`paragraphIndex\` values to \`open_redliner\` so exported Track Changes preserve the Google Doc's exact formatting and re-import as Google Docs Suggestions.\n\n${numbered}`,
+          },
+        ],
+        structuredContent: {
+          sessionId,
+          fileName: parsed.fileName,
+          googleDocUrl,
+          sourceType: 'gdoc',
+          paragraphCount: parsed.paragraphs.length,
+          paragraphs: parsed.paragraphs.slice(0, 200),
+        },
+      };
+    }
+  );
+
+  // 3b. Local-only file readers (disabled in public HTTP / Cloudflare Worker mode!)
   if (!opts.publicMode && opts.readLocalContract) {
     const reader = opts.readLocalContract;
     server.registerTool(
@@ -240,6 +379,10 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
           .string()
           .optional()
           .describe('Optional sessionId from read_contract to preserve original .docx formatting'),
+        googleDocUrl: z
+          .string()
+          .optional()
+          .describe('Optional Google Docs URL from read_google_doc so exports preserve original formatting'),
         redlines: z
           .array(ClauseInputSchema)
           .optional()
@@ -292,13 +435,16 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
         sourceType:
           clauses.length === 0
             ? 'empty'
-            : existing?.sourceType === 'pdf'
-              ? 'pdf'
-              : existing?.sourceDocx
-                ? 'docx'
-                : 'text',
+            : input.googleDocUrl || existing?.googleDocUrl
+              ? 'gdoc'
+              : existing?.sourceType === 'pdf'
+                ? 'pdf'
+                : existing?.sourceDocx
+                  ? 'docx'
+                  : 'text',
         sourceFileName: existing?.sourceFileName,
         sourceFilePath: existing?.sourceFilePath,
+        googleDocUrl: input.googleDocUrl || existing?.googleDocUrl,
         sourceDocx: existing?.sourceDocx,
         clauses,
       };
@@ -410,6 +556,55 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
     }
   );
 
+  // 6b. App-only: parse a browser-uploaded .docx or .pdf (base64) in memory (zero retention)
+  server.registerTool(
+    'app_parse_upload',
+    {
+      title: 'Parse Uploaded Contract (App Only)',
+      description:
+        'Parses a browser-uploaded .docx or .pdf contract (base64) strictly in memory and returns numbered paragraphs.',
+      inputSchema: {
+        fileName: z.string(),
+        base64: z.string(),
+      },
+      annotations: {
+        title: 'Parse Uploaded Contract',
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: { ui: { visibility: ['app'] } },
+    },
+    async ({ fileName, base64 }) => {
+      const buf = Buffer.from(base64, 'base64');
+      const isPdf = fileName.toLowerCase().endsWith('.pdf');
+      if (isPdf) {
+        const parsed = await parsePdfBuffer(buf, fileName);
+        return {
+          content: [{ type: 'text', text: `Parsed PDF ${fileName} (${parsed.paragraphs.length} sections)` }],
+          structuredContent: {
+            ok: true,
+            sourceType: 'pdf',
+            fileName: parsed.fileName,
+            pageCount: parsed.pageCount,
+            paragraphs: parsed.paragraphs.slice(0, 250),
+          },
+        };
+      }
+      const parsed = await parseDocxBuffer(buf, fileName);
+      return {
+        content: [{ type: 'text', text: `Parsed DOCX ${fileName} (${parsed.paragraphs.length} paragraphs)` }],
+        structuredContent: {
+          ok: true,
+          sourceType: 'docx',
+          fileName: parsed.fileName,
+          paragraphs: parsed.paragraphs.slice(0, 250),
+        },
+      };
+    }
+  );
+
   // 7. App-only: stateless-safe 4-format exporter
   server.registerTool(
     'app_export_docx',
@@ -427,6 +622,9 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
         counterparty: z.string().optional(),
         playbookName: z.string().optional(),
         sourceFilePath: z.string().optional(),
+        sourceDocxBase64: z.string().optional(),
+        sourceFileName: z.string().optional(),
+        googleDocUrl: z.string().optional(),
         clauses: z
           .array(
             z.object({
@@ -470,6 +668,9 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
       counterparty,
       playbookName,
       sourceFilePath,
+      sourceDocxBase64,
+      sourceFileName,
+      googleDocUrl,
       clauses: uiClauses,
       decisions,
     }) => {
@@ -507,6 +708,23 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
           ...c,
           diffTokens: computeWordDiff(c.originalText, c.proposedText),
         }));
+        if (!sourceDocx && sourceDocxBase64) {
+          try {
+            sourceDocx = await parseDocxBuffer(
+              Buffer.from(sourceDocxBase64, 'base64'),
+              sourceFileName || 'contract.docx'
+            );
+          } catch {
+            // fallback to clean scratch build
+          }
+        }
+        if (!sourceDocx && googleDocUrl) {
+          try {
+            sourceDocx = await fetchGoogleDocAsDocx(googleDocUrl);
+          } catch {
+            // fallback to clean scratch build
+          }
+        }
         if (!opts.publicMode && !sourceDocx && sourceFilePath && opts.rehydrateLocalDocx) {
           sourceDocx = await opts.rehydrateLocalDocx(sourceFilePath);
         }
