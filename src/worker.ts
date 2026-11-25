@@ -12,6 +12,25 @@ const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Expose-Headers': 'Mcp-Session-Id',
 };
 
+const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E2433"/>
+      <stop offset="100%" stop-color="#0F131C"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <path d="M32 24C32 19.5817 35.5817 16 40 16H74L96 38V104C96 108.418 92.4183 112 88 112H40C35.5817 112 32 108.418 32 104V24Z" fill="#181D29" stroke="#334155" stroke-width="3"/>
+  <path d="M74 16V34C74 36.2091 75.7909 38 78 38H96" stroke="#334155" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="44" y="46" width="28" height="6" rx="3" fill="#64748B"/>
+  <rect x="44" y="61" width="40" height="7" rx="3.5" fill="#F87171"/>
+  <line x1="42" y1="64.5" x2="86" y2="64.5" stroke="#FEE2E2" stroke-width="2" stroke-linecap="round"/>
+  <rect x="44" y="77" width="36" height="7" rx="3.5" fill="#34D399"/>
+  <rect x="44" y="93" width="22" height="6" rx="3" fill="#8AB4F8"/>
+  <circle cx="92" cy="92" r="18" fill="#111827" stroke="#8AB4F8" stroke-width="4"/>
+  <path d="M85 92L90 97L99 87" stroke="#34D399" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
 function landingHtml(origin: string): string {
   const mcpUrl = `${origin}/mcp`;
   return `<!doctype html>
@@ -20,6 +39,7 @@ function landingHtml(origin: string): string {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Fineprint — Free Contract Redliner MCP App</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <style>
     :root { color-scheme: dark; }
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; background: #111318; color: #e2e2e9; display: grid; place-items: center; min-height: 100vh; padding: 24px; }
@@ -131,6 +151,22 @@ export default {
       return new Response(landingHtml(url.origin), {
         status: 200,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
+
+    if (
+      (url.pathname === '/icon.svg' ||
+        url.pathname === '/favicon.svg' ||
+        url.pathname === '/favicon.ico') &&
+      request.method === 'GET'
+    ) {
+      return new Response(ICON_SVG, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/svg+xml',
+          'Cache-Control': 'public, max-age=86400',
+          ...CORS_HEADERS,
+        },
       });
     }
 
