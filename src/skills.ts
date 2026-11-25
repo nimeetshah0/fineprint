@@ -3,14 +3,17 @@ import type { Playbook } from './types.js';
 export const SKILL_URI = 'skill://fineprint/SKILL.md';
 export const SKILL_PLAYBOOKS_URI = 'skill://fineprint/references/playbooks.md';
 
+// Agent Skills require `name` to match the skill's directory, and hosts check the
+// manifest frontmatter against SKILL.md, so both are rendered from these constants.
+const SKILL_NAME = 'fineprint';
+const SKILL_DESCRIPTION =
+  'Review contracts (.docx, .pdf, Google Docs, or pasted text) against startup, agency, or NDA playbooks, render interactive Before/After redline cards in Fineprint, and export native Microsoft Word (.docx) Track Changes with margin comments. Drafting aid only — not legal advice.';
+
 export function renderFineprintSkillMd(): string {
   return `---
-name: fineprint-contract-review
+name: ${SKILL_NAME}
 description: >-
-  Review contracts (.docx, .pdf, Google Docs, or pasted text) against startup,
-  agency, or NDA playbooks, render interactive Before/After redline cards in
-  Fineprint, and export native Microsoft Word (.docx) Track Changes with margin
-  comments. Drafting aid only — not legal advice.
+  ${SKILL_DESCRIPTION}
 ---
 
 # Fineprint Contract Review Workflow
@@ -72,11 +75,7 @@ export async function buildSkillManifest(playbooks: Playbook[]) {
 
   return {
     uri: SKILL_URI,
-    frontmatter: {
-      name: 'fineprint-contract-review',
-      description:
-        'Review contracts (.docx, .pdf, Google Docs, or pasted text) against Fineprint playbooks and export native Word Track Changes (.docx) with margin comments.',
-    },
+    frontmatter: { name: SKILL_NAME, description: SKILL_DESCRIPTION },
     resources: [
       {
         uri: SKILL_URI,

@@ -1,6 +1,6 @@
 {
   "name": "contract-redliner-mcp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Free open-source Contract Redliner MCP App (SEP-1865) with Material 3 UI, native Microsoft Word (.docx) Track Changes + Margin Comments, PDF & Markdown exports",
   "license": "MIT",
   "homepage": "https://fineprint.nimhq.com",
@@ -36,11 +36,12 @@
     "start:http": "node dist/server/server.js --http",
     "dev:cf": "npm run build:ui && wrangler dev",
     "deploy:cf": "npm run build:ui && wrangler deploy",
-    "test:docx": "node test/docx-fidelity.test.mjs && node test/40page-msa.test.mjs"
+    "test:docx": "node test/docx-fidelity.test.mjs && node test/40page-msa.test.mjs",
+    "test:skills": "node test/skills.test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.0.0",
-    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "jszip": "^3.10.1",
     "unpdf": "^0.12.1",
     "zod": "^3.24.2"

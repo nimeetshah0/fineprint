@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import {
   computeWordDiff,
@@ -125,9 +126,9 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
       capabilities: {
         resources: {},
         tools: {},
-        experimental: {
+        extensions: {
           'io.modelcontextprotocol/skills': {
-            directoryRead: true,
+            directoryRead: false,
           },
         },
       },
@@ -150,11 +151,10 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
   });
 
   server.server.setRequestHandler(SkillsGetReq, async ({ params }) => {
-    const manifest = await buildSkillManifest(opts.listPlaybooks());
     if (params.uri !== SKILL_URI) {
-      throw new Error(`Unknown skill URI: ${params.uri}`);
+      throw new McpError(ErrorCode.InvalidParams, `Unknown skill URI: ${params.uri}`);
     }
-    return { skill: manifest };
+    return { skill: await buildSkillManifest(opts.listPlaybooks()) };
   });
 
   // Register Skill resources (skill://fineprint/SKILL.md + references/playbooks.md)
@@ -525,7 +525,7 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
       },
       annotations: {
         title: 'Update Clause Decision',
-        readOnlyHint: true,
+        readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
@@ -653,9 +653,9 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
       },
       annotations: {
         title: 'Export Redlined Contract',
-        readOnlyHint: true,
+        readOnlyHint: false,
         destructiveHint: false,
-        idempotentHint: true,
+        idempotentHint: false,
         openWorldHint: false,
       },
       _meta: { ui: { visibility: ['app'] } },

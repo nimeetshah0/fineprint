@@ -146,9 +146,16 @@ function buildServer(publicMode: boolean) {
           try {
             const dlDir = path.join(os.homedir(), 'Downloads');
             if (fs.existsSync(dlDir)) {
-              const savedPath = path.join(dlDir, fileName);
-              fs.writeFileSync(savedPath, buffer);
-              return savedPath;
+              const { name, ext } = path.parse(fileName);
+              for (let n = 0; ; n++) {
+                const savedPath = path.join(dlDir, n === 0 ? fileName : `${name} (${n})${ext}`);
+                try {
+                  fs.writeFileSync(savedPath, buffer, { flag: 'wx' });
+                  return savedPath;
+                } catch (err) {
+                  if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+                }
+              }
             }
           } catch {
             // fallback to browser download only
