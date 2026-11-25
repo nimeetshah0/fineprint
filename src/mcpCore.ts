@@ -151,6 +151,7 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
         'Returns built-in (and local custom) contract review playbooks (Startup Vendor MSA, Agency Client SOW, Mutual NDA) with risk rules and fallback positions. Call this before reviewing a contract so you redline against the right playbook.',
       inputSchema: {},
       annotations: {
+        title: 'List Contract Playbooks',
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
@@ -245,6 +246,7 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
           .describe('Structured clause redlines generated from the contract'),
       },
       annotations: {
+        title: 'Open Fineprint Contract Redliner',
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
@@ -336,6 +338,7 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
       description: 'Loads a sample SaaS Vendor MSA with 5 classic founder traps.',
       inputSchema: {},
       annotations: {
+        title: 'Load Demo Contract',
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
@@ -375,6 +378,7 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
         proposedText: z.string().optional(),
       },
       annotations: {
+        title: 'Update Clause Decision',
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
@@ -450,6 +454,7 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
           .optional(),
       },
       annotations: {
+        title: 'Export Redlined Contract',
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
@@ -612,6 +617,7 @@ export function createContractRedlinerServer(opts: McpCoreOptions): McpServer {
         ),
       },
       annotations: {
+        title: 'Save Custom Playbook',
         readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: true,
