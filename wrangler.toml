@@ -1,0 +1,14 @@
+name = "fineprint"
+main = "src/worker.ts"
+compatibility_date = "2026-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+routes = [
+  { pattern = "fineprint.nimhq.com", custom_domain = true }
+]
+
+# Bundle the single-file MCP App UI HTML directly into the Worker
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = true
